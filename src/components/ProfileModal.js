@@ -26,12 +26,13 @@ export default function ProfileModal({ user, onClose }) {
     }
   };
 
-  const saveProfile = async () => {
+const saveProfile = async () => {
     await supabase.from('profiles').upsert({
-      user_id: user.id, bio, skills,
+      user_id: user.id,
+      email: user.email,
+      bio, skills,
       interests: selectedInterests.join(',')
-    }, { onConflict: 'user_id' });
-    setSaved(true);
+    }, { onConflict: 'user_id' });    setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 

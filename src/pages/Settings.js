@@ -1,16 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
+import { supabase } from '../utils/supabase';
 
-export default function Settings({ user }) {
+const BACKEND = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+const RANKS = [
+  { name: 'Icon', emoji: '🌟', min: 1000 },
+  { name: 'Legend', emoji: '👑', min: 500 },
+  { name: 'Visionary', emoji: '💎', min: 150 },
+  { name: 'Stellar', emoji: '⭐', min: 50 },
+  { name: 'Blazer', emoji: '🔥', min: 10 },
+  { name: 'Newcomer', emoji: '🌱', min: 0 },
+];
+
+export default function Settings({ user, onNavigate }) {
   const { t, mode, toggleTheme } = useTheme();
+  const { language, changeLanguage, l } = useLanguage();
   const [activeSection, setActiveSection] = useState('Account');
   const [isPrivate, setIsPrivate] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(true);
   const [showFollowers, setShowFollowers] = useState(true);
   const [showWorks, setShowWorks] = useState(true);
   const [deleteText, setDeleteText] = useState('');
+  const [currentPlan, setCurrentPlan] = useState('spark');
+  const [currentRank, setCurrentRank] = useState('🌱 Newcomer');
+  const [loadingPlan, setLoadingPlan] = useState(true);
 
-  const sections = ['Account', 'Privacy', 'Notifications', 'Billing', 'Danger Zone'];
+  const sections = [l.account, l.privacy, l.notifications, l.billing, l.language, l.dangerZone];
+
+  const languages = [
+    { code: 'en', label: 'English', flag: '🇬🇧' },
+    { code: 'ta', label: 'தமிழ்', flag: '🇮🇳' },
+    { code: 'hi', label: 'हिंदी', flag: '🇮🇳' },
+  ];
+
+  useEffect(() => {
+    fetchPlanAndRank();
+  }, []);
+
+  const fetchPlanAndRank = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`${BACKEND}/api/stripe/my-plan`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      const planData = await res.json();
+      if (planData.plan) setCurrentPlan(planData.plan);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('rank')
+        .eq('user_id', session.user.id)
+        .single();
+      if (profile?.rank) setCurrentRank(profile.rank);
+    } catch (err) {
+      console.error('Settings fetch error:', err);
+    } finally {
+      setLoadingPlan(false);
+    }
+  };
+
+  const handleUpgrade = async (plan) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${BACKEND}/api/stripe/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ plan })
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch (err) {
+      console.error('Upgrade error:', err);
+    }
+  };
 
   const Toggle = ({ value, onChange }) => (
     <div
@@ -45,16 +114,31 @@ export default function Settings({ user }) {
     </div>
   );
 
+  const planMeta = {
+    spark: { label: 'Spark', color: '#94a3b8', icon: '✏️' },
+    creator: { label: 'Creator', color: '#3b82f6', icon: '🎨' },
+    masterpiece: { label: 'Masterpiece', color: '#a855f7', icon: '🌌' },
+  };
+
+  // Map translated section names back to keys for rendering
+  const sectionKey = () => {
+    if (activeSection === l.account) return 'Account';
+    if (activeSection === l.privacy) return 'Privacy';
+    if (activeSection === l.notifications) return 'Notifications';
+    if (activeSection === l.billing) return 'Billing';
+    if (activeSection === l.language) return 'Language';
+    if (activeSection === l.dangerZone) return 'Danger Zone';
+    return activeSection;
+  };
+
   return (
     <div>
       <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ color: t.textPrimary, fontSize: '32px', fontWeight: 700, margin: '0 0 6px' }}>Settings</h1>
-        <p style={{ color: t.textSecondary, fontSize: '15px', margin: 0 }}>Manage your account and preferences</p>
+        <h1 style={{ color: t.textPrimary, fontSize: '32px', fontWeight: 700, margin: '0 0 6px' }}>{l.settingsTitle}</h1>
+        <p style={{ color: t.textSecondary, fontSize: '15px', margin: 0 }}>{l.settingsDesc}</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '24px' }}>
-
-        {/* Left Nav */}
         <div style={{
           background: t.bgCard, border: `1px solid ${t.border}`,
           borderRadius: '12px', padding: '8px', height: 'fit-content'
@@ -72,26 +156,23 @@ export default function Settings({ user }) {
                 borderLeft: activeSection === section ? `2px solid ${t.accent}` : '2px solid transparent'
               }}
             >
-              {section === 'Danger Zone' ? '⚠️ ' : ''}{section}
+              {section === l.dangerZone ? '⚠️ ' : ''}{section}
             </div>
           ))}
         </div>
 
-        {/* Right Content */}
         <div style={{
           background: t.bgCard, border: `1px solid ${t.border}`,
           borderRadius: '12px', padding: '24px'
         }}>
 
-          {activeSection === 'Account' && (
+          {sectionKey() === 'Account' && (
             <div>
-              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>Account Settings</h3>
-
-              <SettingRow label="Email Address" desc="Your primary email">
+              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>{l.account}</h3>
+              <SettingRow label={l.emailAddress} desc={l.primaryEmail}>
                 <span style={{ color: t.textSecondary, fontSize: '13px' }}>{user?.email}</span>
               </SettingRow>
-
-              <SettingRow label="Username" desc="Your display name">
+              <SettingRow label={l.username} desc={l.displayName}>
                 <input
                   defaultValue={user?.email?.split('@')[0]}
                   style={{
@@ -101,8 +182,7 @@ export default function Settings({ user }) {
                   }}
                 />
               </SettingRow>
-
-              <SettingRow label="Theme" desc="Choose your preferred theme">
+              <SettingRow label={l.theme} desc={l.preferredTheme}>
                 <button
                   onClick={toggleTheme}
                   style={{
@@ -112,59 +192,69 @@ export default function Settings({ user }) {
                     display: 'flex', alignItems: 'center', gap: '6px'
                   }}
                 >
-                  {mode === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                  {mode === 'dark' ? `🌙 ${l.dark}` : `☀️ ${l.light}`}
                 </button>
               </SettingRow>
-
-              <SettingRow label="Contribution Rank" desc="Earned through activity">
+              <SettingRow label={l.contributionRank} desc={l.rankDesc}>
                 <span style={{
                   padding: '4px 12px', borderRadius: '20px',
                   background: t.accentSubtle, color: t.accent,
                   fontSize: '12px', fontWeight: 600
-                }}>🌱 Newcomer</span>
+                }}>
+                  {currentRank}
+                </span>
               </SettingRow>
-
-              <SettingRow label="Change Password" desc="Update your password">
+              <SettingRow label={l.currentPlan} desc={l.subscriptionPlan}>
+                <span style={{
+                  padding: '4px 12px', borderRadius: '20px',
+                  background: `${planMeta[currentPlan]?.color}22`,
+                  color: planMeta[currentPlan]?.color,
+                  fontSize: '12px', fontWeight: 600
+                }}>
+                  {planMeta[currentPlan]?.icon} {planMeta[currentPlan]?.label}
+                </span>
+              </SettingRow>
+              <SettingRow label={l.changePassword} desc="">
                 <button style={{
                   padding: '6px 14px', background: t.bgSecondary,
                   border: `1px solid ${t.border}`, borderRadius: '6px',
                   color: t.textPrimary, fontSize: '13px', cursor: 'pointer'
                 }}>
-                  Update Password
+                  {l.updatePassword}
                 </button>
               </SettingRow>
             </div>
           )}
 
-          {activeSection === 'Privacy' && (
+          {sectionKey() === 'Privacy' && (
             <div>
-              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>Privacy Settings</h3>
-              <SettingRow label="Private Profile" desc="Only followers can see your content">
+              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>{l.privacy}</h3>
+              <SettingRow label={l.privateProfile} desc={l.privateProfileDesc}>
                 <Toggle value={isPrivate} onChange={setIsPrivate} />
               </SettingRow>
-              <SettingRow label="Show on Leaderboard" desc="Allow your name to appear in rankings">
+              <SettingRow label={l.showLeaderboard} desc={l.showLeaderboardDesc}>
                 <Toggle value={showLeaderboard} onChange={setShowLeaderboard} />
               </SettingRow>
-              <SettingRow label="Show Followers List" desc="Let others see who follows you">
+              <SettingRow label={l.showFollowers} desc={l.showFollowersDesc}>
                 <Toggle value={showFollowers} onChange={setShowFollowers} />
               </SettingRow>
-              <SettingRow label="Show My Works" desc="Display your content publicly">
+              <SettingRow label={l.showWorks} desc={l.showWorksDesc}>
                 <Toggle value={showWorks} onChange={setShowWorks} />
               </SettingRow>
             </div>
           )}
 
-          {activeSection === 'Notifications' && (
+          {sectionKey() === 'Notifications' && (
             <div>
-              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>Notification Settings</h3>
-              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 16px' }}>Site Notifications</p>
-              {['Star count alerts', 'Like notifications', 'Comment notifications', 'DM notifications'].map(item => (
+              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>{l.notifications}</h3>
+              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 16px' }}>{l.siteNotifications}</p>
+              {[l.starAlerts, l.likeNotifications, l.commentNotifications, l.dmNotifications].map(item => (
                 <SettingRow key={item} label={item}>
                   <Toggle value={true} onChange={() => {}} />
                 </SettingRow>
               ))}
-              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '16px 0' }}>Email Notifications</p>
-              {['Recent platform updates', 'Weekly digest'].map(item => (
+              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '16px 0' }}>{l.emailNotifications}</p>
+              {[l.platformUpdates, l.weeklyDigest].map(item => (
                 <SettingRow key={item} label={item}>
                   <Toggle value={false} onChange={() => {}} />
                 </SettingRow>
@@ -172,50 +262,105 @@ export default function Settings({ user }) {
             </div>
           )}
 
-          {activeSection === 'Billing' && (
+          {sectionKey() === 'Billing' && (
             <div>
-              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>Billing & Plans</h3>
+              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 8px' }}>{l.billingPlans}</h3>
+              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 20px' }}>
+                {l.currentPlanLabel}: <strong style={{ color: planMeta[currentPlan]?.color }}>
+                  {planMeta[currentPlan]?.icon} {planMeta[currentPlan]?.label}
+                </strong>
+              </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                 {[
-                  { name: 'Spark', price: 'Free', color: t.textSecondary, current: true },
-                  { name: 'Creator', price: '₹299/mo', color: t.accent, current: false },
-                  { name: 'Masterpiece', price: '₹999/mo', color: '#8b5cf6', current: false },
-                ].map(plan => (
-                  <div key={plan.name} style={{
-                    background: t.bgSecondary, border: `1px solid ${plan.current ? plan.color : t.border}`,
-                    borderRadius: '10px', padding: '16px', textAlign: 'center'
-                  }}>
-                    <p style={{ color: plan.color, fontWeight: 700, fontSize: '16px', margin: '0 0 4px' }}>{plan.name}</p>
-                    <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 12px' }}>{plan.price}</p>
-                    {plan.current
-                      ? <span style={{ color: t.success, fontSize: '12px' }}>✅ Current Plan</span>
-                      : <button style={{ padding: '6px 16px', background: plan.color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>Upgrade</button>
-                    }
+                  { id: 'spark', name: 'Spark', price: 'Free', color: '#94a3b8', icon: '✏️' },
+                  { id: 'creator', name: 'Creator', price: '₹299/mo', color: '#3b82f6', icon: '🎨' },
+                  { id: 'masterpiece', name: 'Masterpiece', price: '₹999/mo', color: '#a855f7', icon: '🌌' },
+                ].map(plan => {
+                  const isCurrent = currentPlan === plan.id;
+                  return (
+                    <div key={plan.id} style={{
+                      background: t.bgSecondary,
+                      border: `1px solid ${isCurrent ? plan.color : t.border}`,
+                      borderRadius: '10px', padding: '16px', textAlign: 'center'
+                    }}>
+                      <p style={{ fontSize: '22px', margin: '0 0 4px' }}>{plan.icon}</p>
+                      <p style={{ color: plan.color, fontWeight: 700, fontSize: '16px', margin: '0 0 4px' }}>{plan.name}</p>
+                      <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 12px' }}>{plan.price}</p>
+                      {isCurrent
+                        ? <span style={{ color: t.success, fontSize: '12px' }}>✅ {l.currentPlanLabel}</span>
+                        : plan.id !== 'spark' && (
+                          <button
+                            onClick={() => handleUpgrade(plan.id)}
+                            style={{
+                              padding: '6px 16px', background: plan.color,
+                              color: 'white', border: 'none', borderRadius: '6px',
+                              cursor: 'pointer', fontSize: '12px', fontWeight: 600
+                            }}
+                          >
+                            {l.upgrade}
+                          </button>
+                        )
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {sectionKey() === 'Language' && (
+            <div>
+              <h3 style={{ color: t.textPrimary, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>{l.selectLanguage}</h3>
+              <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 20px' }}>{l.languageDesc}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {languages.map(lang => (
+                  <div
+                    key={lang.code}
+                    onClick={() => changeLanguage(lang.code)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '14px 16px', borderRadius: '10px', cursor: 'pointer',
+                      border: `1px solid ${language === lang.code ? t.accent : t.border}`,
+                      background: language === lang.code ? t.accentSubtle : t.bgSecondary,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span style={{ fontSize: '22px' }}>{lang.flag}</span>
+                      <span style={{
+                        color: language === lang.code ? t.accent : t.textPrimary,
+                        fontWeight: language === lang.code ? 600 : 400,
+                        fontSize: '14px'
+                      }}>
+                        {lang.label}
+                      </span>
+                    </div>
+                    {language === lang.code && (
+                      <span style={{
+                        color: t.accent, fontSize: '16px', fontWeight: 700
+                      }}>✓</span>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {activeSection === 'Danger Zone' && (
+          {sectionKey() === 'Danger Zone' && (
             <div>
-              <h3 style={{ color: t.danger, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>⚠️ Danger Zone</h3>
+              <h3 style={{ color: t.danger, fontSize: '16px', fontWeight: 600, margin: '0 0 20px' }}>⚠️ {l.dangerZone}</h3>
               <div style={{
                 background: t.dangerSubtle, border: `1px solid ${t.danger}44`,
                 borderRadius: '10px', padding: '20px'
               }}>
-                <p style={{ color: t.textPrimary, fontWeight: 600, fontSize: '14px', margin: '0 0 4px' }}>Delete Account</p>
-                <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 16px' }}>
-                  This action is permanent and cannot be undone. All your data will be deleted.
-                </p>
-                <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 8px' }}>
-                  Type <strong style={{ color: t.danger }}>Yes</strong> to confirm:
-                </p>
+                <p style={{ color: t.textPrimary, fontWeight: 600, fontSize: '14px', margin: '0 0 4px' }}>{l.deleteAccount}</p>
+                <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 16px' }}>{l.deleteDesc}</p>
+                <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 8px' }}>{l.typeYes}</p>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     value={deleteText}
                     onChange={e => setDeleteText(e.target.value)}
-                    placeholder="Type Yes to confirm"
+                    placeholder={l.typeYesPlaceholder}
                     style={{
                       padding: '8px 12px', background: t.bgSecondary,
                       border: `1px solid ${t.border}`, borderRadius: '6px',
@@ -232,12 +377,13 @@ export default function Settings({ user }) {
                       fontSize: '13px', cursor: deleteText === 'Yes' ? 'pointer' : 'not-allowed'
                     }}
                   >
-                    Delete Account
+                    {l.deleteAccount}
                   </button>
                 </div>
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>
