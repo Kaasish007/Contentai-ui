@@ -34,6 +34,20 @@ export default function Canvas({ user, onStarGifted }) {
   useEffect(() => {
     fetchPosts();
     fetchFollowingIds();
+
+    // Real-time subscription for new posts
+    const channel = supabase
+      .channel('canvas-posts')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'canvas_posts'
+      }, (payload) => {
+        setPosts(prev => [payload.new, ...prev]);
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, []);
 
   const fetchFollowingIds = async () => {
@@ -56,6 +70,15 @@ export default function Canvas({ user, onStarGifted }) {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setPosts(data || []);
+
+      // Fetch which posts this user has liked
+      if (user?.id) {
+        const { data: likes } = await supabase
+          .from('post_likes')
+          .select('post_id')
+          .eq('user_id', user.id);
+        setLikedPosts((likes || []).map(l => l.post_id));
+      }
     } catch (err) {
       console.log('Fetch posts error:', err.message);
     }
@@ -77,7 +100,6 @@ export default function Canvas({ user, onStarGifted }) {
       });
       if (error) throw error;
       setNewPost('');
-      await fetchPosts();
     } catch (err) {
       console.log('Post error:', err.message);
     }
@@ -87,12 +109,23 @@ export default function Canvas({ user, onStarGifted }) {
   const handleLike = async (post) => {
     const isLiked = likedPosts.includes(post.id);
     const newLikes = isLiked ? post.likes - 1 : post.likes + 1;
+
     setLikedPosts(isLiked
       ? likedPosts.filter(p => p !== post.id)
       : [...likedPosts, post.id]
     );
     setPosts(posts.map(p => p.id === post.id ? { ...p, likes: newLikes } : p));
+
     await supabase.from('canvas_posts').update({ likes: newLikes }).eq('id', post.id);
+
+    if (isLiked) {
+      await supabase.from('post_likes').delete()
+        .eq('post_id', post.id).eq('user_id', user.id);
+    } else {
+      await supabase.from('post_likes').insert({
+        post_id: post.id, user_id: user.id
+      });
+    }
   };
 
   const fetchComments = async (postId) => {
@@ -218,7 +251,6 @@ export default function Canvas({ user, onStarGifted }) {
             <p style={{ color: t.textSecondary, fontSize: '13px', margin: '0 0 20px' }}>
               Send stars to <strong style={{ color: t.accent }}>{giftModal.to_name}</strong>
             </p>
-
             <p style={{ color: t.textMuted, fontSize: '12px', margin: '0 0 8px' }}>How many stars?</p>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
               {[1, 3, 5, 10].map(n => (
@@ -236,13 +268,11 @@ export default function Canvas({ user, onStarGifted }) {
                 </button>
               ))}
             </div>
-
             {giftMsg && (
               <p style={{ fontSize: '13px', margin: '0 0 12px', color: giftMsg.startsWith('✅') ? t.success : t.danger }}>
                 {giftMsg}
               </p>
             )}
-
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 onClick={() => setGiftModal(null)}
@@ -429,7 +459,9 @@ export default function Canvas({ user, onStarGifted }) {
                     background: 'none', border: 'none', cursor: 'pointer',
                     color: t.textSecondary, fontSize: '13px',
                     display: 'flex', alignItems: 'center', gap: '4px'
-                  }}>
+                  }}
+                    onClick={() => navigator.clipboard.writeText(post.content)}
+                  >
                     📤 Share
                   </button>
                 </div>
