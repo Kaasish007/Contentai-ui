@@ -3,7 +3,6 @@
   padding: 0;
   box-sizing: border-box;
 }
-
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -11,56 +10,149 @@ body {
   -webkit-font-smoothing: antialiased;
   transition: background 0.2s, color 0.2s;
 }
-
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
-
 input, textarea, button, select { font-family: inherit; }
 button { cursor: pointer; }
 
-/* Page fade-in */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.page-enter { animation: fadeIn 0.25s ease forwards; }
 
-.page-enter {
-  animation: fadeIn 0.25s ease forwards;
-}
-/* Card hover lift */
-.card-hover {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-}
+.card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
 
-/* Button press */
-button:active {
-  transform: scale(0.97);
-}
+button:active { transform: scale(0.97); }
 
-/* Smooth modal backdrop */
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+.modal-backdrop { animation: backdropIn 0.15s ease forwards; }
 
-.modal-backdrop {
-  animation: backdropIn 0.15s ease forwards;
-}
-
-/* Skeleton pulse for loading states */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
-
 .skeleton {
   animation: pulse 1.5s ease-in-out infinite;
   background: rgba(255,255,255,0.06);
   border-radius: 6px;
+}
+
+/* ===================== */
+/* MOBILE RESPONSIVE     */
+/* ===================== */
+
+/* Make all grids stack on mobile */
+@media (max-width: 768px) {
+
+  /* Fix any grid that has repeat columns */
+  [style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: repeat(2"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: 200px 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: 1fr 2fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+  [style*="grid-template-columns: repeat(4"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Fix padding on sections */
+  [style*="padding: '32px'"] {
+    padding: 16px !important;
+  }
+
+  /* AboutUs landing page mobile fixes */
+  .about-hero h1 {
+    font-size: 36px !important;
+  }
+
+  /* Modal fixes */
+  [style*="position: 'fixed'"][style*="width: '480px'"],
+  [style*="position: 'fixed'"][style*="width: '520px'"],
+  [style*="position: 'fixed'"][style*="width: '600px'"] {
+    width: calc(100vw - 32px) !important;
+    left: 16px !important;
+    right: 16px !important;
+  }
+}
+
+/* Landing page (AboutUs) mobile */
+@media (max-width: 768px) {
+  /* Nav padding */
+  nav[style*="padding: '20px 48px'"] {
+    padding: 16px 20px !important;
+  }
+
+  /* Hero title */
+  h1[style*="font-size: 'clamp(48px"] {
+    font-size: 36px !important;
+    letter-spacing: -1px !important;
+  }
+
+  /* Section padding */
+  section[style*="padding: '100px 48px'"] {
+    padding: 60px 20px !important;
+  }
+
+  /* Story grid */
+  [style*="grid-template-columns: '1fr 2fr'"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Mission section */
+  [style*="padding: '80px 64px'"] {
+    padding: 40px 24px !important;
+  }
+
+  /* CTA section */
+  [style*="padding: '80px 48px'"] {
+    padding: 40px 24px !important;
+  }
+
+  /* Pricing scale fix */
+  [style*="transform: plan.popular"] {
+    transform: scale(1) !important;
+  }
+
+  /* Feature cards 2 column on mobile */
+  [style*="gridTemplateColumns: '1fr 1fr'"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Testimonials */
+  [style*="gridTemplateColumns: 'repeat(3, 1fr)'"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stats row */
+  [style*="gridTemplateColumns: 'repeat(4, 1fr)'"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Hide scroll indicator on mobile */
+  [style*="position: 'absolute'"][style*="bottom: 40"] {
+    display: none !important;
+  }
+}
+
+/* Tablet */
+@media (max-width: 1024px) and (min-width: 769px) {
+  [style*="grid-template-columns: repeat(3"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
 }
